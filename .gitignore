@@ -1,0 +1,12 @@
+training/datasets/
+sound/
+.venv/
+firmware/build/
+benchmarks
+
+__pycache__/
+*.tar.gz
+*.m4a
+*.wav
+.DS_Store
+firmware/include/data.h
