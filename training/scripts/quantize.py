@@ -1,43 +1,30 @@
 import tensorflow as tf
+import numpy as np
 import os
-import sys
-import shutil
-from pathlib import Path
-from train_kws import load_audio, extract_features
 
-if len(sys.argv) < 2:
-    print("Usage: python quantize.py <model_name.keras>")
-    sys.exit(1)
-model_name = sys.argv[1]
+MODEL_DIR = "trained_model" 
+TFLITE_FILE = "firmware/src/model.tflite"
 
-model_path = (f'training/outputs/{model_name}')
-model = tf.keras.models.load_model(model_path)
+def representative_dataset():
+    for _ in range(100):
+        data = np.random.uniform(0, 1, size=(1, 66, 129, 1)).astype(np.float32)
+        yield [data]
 
-# fix for keras 3 compatability
-temp_dir = "temp_tf_saved_model"
-if os.path.exists(temp_dir):
-    shutil.rmtree(temp_dir)
-model.export(temp_dir)
+def quantize():
+    print(f"Loading model from {MODEL_DIR}...")
+    converter = tf.lite.TFLiteConverter.from_saved_model(MODEL_DIR)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+    converter.inference_input_type = tf.int8
+    converter.inference_output_type = tf.int8
+    converter.representative_dataset = representative_dataset
 
-def representative_data():
-    data_dir = Path('training/datasets/speech_commands_v0.02')
-    on_files = list((data_dir / 'on').glob('*.wav'))
-    for file_path in on_files[:100]:
-        audio = load_audio(file_path)
-        spectrogram = extract_features(audio)
-        spectrogram = tf.expand_dims(spectrogram, axis=0)
-        yield [spectrogram]
+    tflite_model = converter.convert()
+    with open(TFLITE_FILE, "wb") as f:
+        f.write(tflite_model)
+    
+    print(f"Quantized model saved to {TFLITE_FILE}")
+    print(f"   Size: {len(tflite_model)} bytes")
 
-converter = tf.lite.TFLiteConverter.from_saved_model(temp_dir)
-converter.optimizations = [tf.lite.Optimize.DEFAULT]
-converter.representative_dataset = representative_data
-converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-converter.inference_input_type = tf.int8
-converter.inference_output_type = tf.int8
-tflite_model = converter.convert()
-open('model.tflite', 'wb').write(tflite_model)
-
-if os.path.exists(temp_dir):
-    shutil.rmtree(temp_dir)
-
-
+if __name__ == "__main__":
+    quantize()
