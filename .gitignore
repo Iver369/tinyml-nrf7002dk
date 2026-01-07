@@ -10,3 +10,4 @@ __pycache__/
 *.wav
 .DS_Store
 firmware/include/data.h
+firmware/include/wifi_credentials.h
